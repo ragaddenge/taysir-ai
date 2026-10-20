@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const GROQ_API_KEY = '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';
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 
 export async function POST(request: NextRequest) {
   try {
