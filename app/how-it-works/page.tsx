@@ -1,131 +1,196 @@
 import Link from 'next/link';
-import Navbar from '../components/Navbar';
-import Footer from '../components/Footer'; // <-- تمت إضافة استيراد الفوتر
+
+type Status = 'available' | 'soon';
+
+type Step = {
+  title: string;
+  description: string;
+  status: Status;
+  href?: string;
+};
+
+// غيّر الشارة هنا: 'soon' ← 'available' أو العكس
+const steps: Step[] = [
+  {
+    title: 'المسح الذكي',
+    description:
+      'صوّر ورقة كتابة الطفل أو ارفعها. الصورة بتتصغّر على جهازك قبل ما تتبعت للتحليل.',
+    status: 'available',
+    href: '/scanner',
+  },
+  {
+    title: 'تقرير التحليل',
+    description:
+      'Google Gemini بيقرأ خط اليد مباشرة من الصورة ويطلّع مؤشرات محتملة وملاحظات. لو الصورة مش مقروءة بتظهر لك رسالة واضحة بدل تقرير غلط.',
+    status: 'available',
+    href: '/scanner',
+  },
+  {
+    title: 'التمارين والألعاب',
+    description:
+      'تمارين وألعاب بسيطة لتدريب القراءة والكتابة، تقدر تبدأ بيها في أي وقت.',
+    status: 'available',
+    href: '/exercises',
+  },
+  {
+    title: 'الحسابات الحقيقية',
+    description:
+      'الدخول حالياً تجريبي للعرض فقط. حسابات حقيقية بحماية كاملة جاية في مرحلة لاحقة.',
+    status: 'soon',
+  },
+  {
+    title: 'متابعة التقدم',
+    description:
+      'البيانات اللي في لوحة المتابعة دلوقتي تجريبية. ربطها ببيانات الطفل الفعلية لسه ما اتعملش.',
+    status: 'soon',
+  },
+  {
+    title: 'التقارير الدورية',
+    description: 'تقارير تتبعت للأهل بشكل منتظم، لسه ما اتنفّذتش.',
+    status: 'soon',
+  },
+];
+
+const technologies = [
+  {
+    name: 'Google Gemini',
+    role: 'قراءة خط اليد وتحليله من الصورة',
+  },
+  {
+    name: 'Next.js',
+    role: 'بناء الموقع وصفحاته',
+  },
+  {
+    name: 'Resend',
+    role: 'إرسال رسائل فورم التواصل',
+  },
+  {
+    name: 'Vercel',
+    role: 'استضافة الموقع (مخطط)',
+  },
+];
+
+const badge: Record<Status, { label: string; className: string }> = {
+  available: {
+    label: 'متاح',
+    className:
+      'bg-green-700 text-white dark:bg-green-400 dark:text-green-950',
+  },
+  soon: {
+    label: 'قريباً',
+    className:
+      'bg-amber-700 text-white dark:bg-amber-300 dark:text-amber-950',
+  },
+};
 
 export default function HowItWorksPage() {
-  const steps = [
-    { number: '01', title: 'إنشاء حساب', description: 'يسجل ولي الأمر حساباً جديداً ويُنشئ ملفاً شخصياً للطفل يتضمن العمر والصف الدراسي ومستوى الصعوبة.', icon: '👤', color: 'from-[#1E88E5] to-[#42A5F5]' },
-    { number: '02', title: 'المسح الذكي', description: 'يتم تصوير ورقة كتابة الطفل أو رفع صورة، ويقوم الذكاء الاصطناعي بتحليل الأخطاء الإملائية والنحوية تلقائياً.', icon: '📸', color: 'from-[#43A047] to-[#66BB6A]' },
-    { number: '03', title: 'تحليل الأنماط', description: 'يحدد النظام أنماط الأخطاء المتكررة (مثل: التاء المربوطة، الهمزة، النقاط) ويصنفها حسب نوع الصعوبة.', icon: '🧠', color: 'from-[#8E24AA] to-[#AB47BC]' },
-    { number: '04', title: 'تمارين مخصصة', description: 'يُولّد النظام تمارين علاجية مخصصة تستهدف نقاط الضعف المحددة، مع مستويات صعوبة متدرجة.', icon: '🎯', color: 'from-[#E53935] to-[#EF5350]' },
-    { number: '05', title: 'متابعة التقدم', description: 'يتابع ولي الأمر تقدم الطفل عبر لوحة تحكم تفاعلية تعرض الإحصائيات والإنجازات والتوصيات الذكية.', icon: '📊', color: 'from-[#FFB300] to-[#FFC107]' },
-    { number: '06', title: 'تقارير دورية', description: 'يصدر النظام تقارير أسبوعية وشهرية مفصلة يمكن مشاركتها مع المعلمين والمختصين لمتابعة الحالة.', icon: '📄', color: 'from-[#00ACC1] to-[#26C6DA]' }
-  ];
-
-  const features = [
-    { title: 'دقة عالية', stat: '95%', description: 'تحليل الأخطاء بدقة عالية', icon: '🎯' },
-    { title: 'سرعة فائقة', stat: '<3s', description: 'نتائج فورية خلال ثوانٍ', icon: '⚡' },
-    { title: 'تمارين ذكية', stat: '500+', description: 'تمرين علاجي مكيف', icon: '🎮' },
-    { title: 'دعم عربي', stat: '100%', description: 'واجهة وتمارين بالعربية', icon: '🇸🇦' }
-  ];
-
-  const technologies = [
-    { name: 'Next.js 16', description: 'إطار عمل React الأحدث', icon: '⚛️' },
-    { name: 'TypeScript', description: 'لغة برمجة آمنة', icon: '📘' },
-    { name: 'Tailwind CSS', description: 'تصميم حديث وسريع', icon: '🎨' },
-    { name: 'AI/ML', description: 'ذكاء اصطناعي متقدم', icon: '🤖' },
-    { name: 'OpenAI API', description: 'تحليل ذكي للصور', icon: '🧠' },
-    { name: 'Vercel', description: 'استضافة سحابية', icon: '☁️' }
-  ];
-
   return (
-    <div className="min-h-screen bg-[#FDF6E3] dark:bg-[#0f0f1e] transition-colors duration-300" dir="rtl">
-      <Navbar />
+    <main className="mx-auto max-w-4xl px-4 py-12 text-gray-900 dark:text-gray-100">
+      <header className="mb-10">
+        <h1 className="mb-3 text-3xl font-bold text-blue-800 dark:text-blue-300 md:text-4xl">
+          إزاي بيشتغل تيسير AI؟
+        </h1>
+        <p className="max-w-2xl text-lg leading-relaxed text-gray-700 dark:text-gray-300">
+          من صورة كتابة الطفل لحد ملاحظات تساعدك تفهم نقاط القوة والصعوبات.
+          هنوضّح لك هنا إيه المتاح فعلاً دلوقتي وإيه لسه تحت التطوير.
+        </p>
+      </header>
 
-      {/* Hero Section */}
-      <section className="bg-gradient-to-br from-[#1E88E5] to-[#43A047] py-20 px-6 text-white">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="text-7xl mb-6">⚙️</div>
-          <h1 className="text-6xl font-black mb-6">كيف نعمل؟</h1>
-          <p className="text-2xl leading-relaxed opacity-95">
-            6 خطوات بسيطة لتحويل تحدي التعلم إلى رحلة نجاح ممتعة
-          </p>
-        </div>
+      <section
+        aria-labelledby="before-use"
+        className="mb-12 rounded-xl border-2 border-blue-800 bg-blue-50 p-5 dark:border-blue-300 dark:bg-blue-950"
+      >
+        <h2
+          id="before-use"
+          className="mb-2 text-xl font-bold text-blue-900 dark:text-blue-200"
+        >
+          قبل الاستخدام
+        </h2>
+        <ul className="list-disc space-y-2 pr-5 leading-relaxed text-gray-800 dark:text-gray-200">
+          <li>
+            صورة الكتابة بتتبعت لخدمة Google Gemini عشان تتحلل. ما ترفعش صور
+            فيها اسم الطفل أو بيانات تعريفية.
+          </li>
+          <li>
+            النتيجة أولية وتعليمية، وليست تشخيصاً طبياً أو تربوياً. لو عندك قلق
+            على الطفل، راجع مختص.
+          </li>
+        </ul>
       </section>
 
-      {/* Steps Section */}
-      <section className="py-20 px-6">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-4xl font-black text-center mb-16 text-[#2C3E50] dark:text-white transition-colors">
-            رحلة الطفل مع تيسير AI
-          </h2>
-          
-          <div className="space-y-8">
-            {steps.map((step, index) => (
-              <div key={index} className="flex items-center gap-6 bg-white dark:bg-[#1a1a2e] p-6 rounded-3xl shadow-lg hover:shadow-xl transition-all">
-                <div className={`w-24 h-24 bg-gradient-to-br ${step.color} rounded-2xl flex flex-col items-center justify-center text-white shadow-lg flex-shrink-0`}>
-                  <div className="text-4xl mb-1">{step.icon}</div>
-                  <div className="text-xl font-black">{step.number}</div>
+      <section aria-labelledby="steps-title" className="mb-12">
+        <h2
+          id="steps-title"
+          className="mb-6 text-2xl font-bold text-gray-900 dark:text-white"
+        >
+          الخطوات
+        </h2>
+        <ol className="space-y-4">
+          {steps.map((step, index) => (
+            <li
+              key={step.title}
+              className="flex gap-4 rounded-xl border border-gray-300 bg-white p-5 dark:border-gray-600 dark:bg-gray-900"
+            >
+              <span
+                aria-hidden="true"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-800 text-lg font-bold text-white dark:bg-blue-300 dark:text-blue-950"
+              >
+                {index + 1}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="mb-1 flex flex-wrap items-center gap-3">
+                  <h3 className="text-lg font-bold">{step.title}</h3>
+                  <span
+                    className={`rounded-full px-3 py-0.5 text-sm font-semibold ${badge[step.status].className}`}
+                  >
+                    {badge[step.status].label}
+                  </span>
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-2xl font-black text-[#2C3E50] dark:text-white mb-2 transition-colors">{step.title}</h3>
-                  <p className="text-lg text-[#2C3E50]/80 dark:text-gray-300 leading-relaxed transition-colors">{step.description}</p>
-                </div>
+                <p className="leading-relaxed text-gray-700 dark:text-gray-300">
+                  {step.description}
+                </p>
+                {step.status === 'available' && step.href && (
+                  <Link
+                    href={step.href}
+                    className="mt-3 inline-block font-semibold text-blue-800 underline underline-offset-4 hover:text-blue-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-800 dark:text-blue-300 dark:hover:text-blue-100 dark:focus-visible:outline-blue-300"
+                  >
+                    جرّب دلوقتي
+                  </Link>
+                )}
               </div>
-            ))}
-          </div>
-        </div>
+            </li>
+          ))}
+        </ol>
       </section>
 
-      {/* Features Stats */}
-      <section className="py-20 px-6 bg-white dark:bg-[#1a1a2e] transition-colors">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-4xl font-black text-center mb-16 text-[#2C3E50] dark:text-white transition-colors">
-            لماذا تيسير AI؟
-          </h2>
-          
-          <div className="grid md:grid-cols-4 gap-6">
-            {features.map((feature, index) => (
-              <div key={index} className="bg-[#FDF6E3] dark:bg-[#0f0f1e] p-6 rounded-3xl text-center hover:shadow-xl transition-all hover:-translate-y-2">
-                <div className="text-5xl mb-3">{feature.icon}</div>
-                <div className="text-4xl font-black text-[#1E88E5] dark:text-[#42A5F5] mb-2 transition-colors">{feature.stat}</div>
-                <h3 className="text-xl font-black text-[#2C3E50] dark:text-white mb-2 transition-colors">{feature.title}</h3>
-                <p className="text-[#2C3E50]/80 dark:text-gray-300 transition-colors">{feature.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+      <section aria-labelledby="tech-title" className="mb-12">
+        <h2
+          id="tech-title"
+          className="mb-6 text-2xl font-bold text-gray-900 dark:text-white"
+        >
+          التقنيات المستخدمة
+        </h2>
+        <dl className="divide-y divide-gray-300 rounded-xl border border-gray-300 bg-white dark:divide-gray-600 dark:border-gray-600 dark:bg-gray-900">
+          {technologies.map((tech) => (
+            <div
+              key={tech.name}
+              className="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-baseline sm:gap-6"
+            >
+              <dt className="w-40 shrink-0 font-bold">{tech.name}</dt>
+              <dd className="text-gray-700 dark:text-gray-300">{tech.role}</dd>
+            </div>
+          ))}
+        </dl>
       </section>
 
-      {/* Technologies */}
-      <section className="py-20 px-6">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-4xl font-black text-center mb-16 text-[#2C3E50] dark:text-white transition-colors">
-            التقنيات المستخدمة
-          </h2>
-          
-          <div className="grid md:grid-cols-3 gap-6">
-            {technologies.map((tech, index) => (
-              <div key={index} className="bg-white dark:bg-[#1a1a2e] p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all flex items-center gap-4">
-                <div className="text-4xl">{tech.icon}</div>
-                <div>
-                  <h3 className="text-xl font-black text-[#2C3E50] dark:text-white transition-colors">{tech.name}</h3>
-                  <p className="text-[#2C3E50]/70 dark:text-gray-400 transition-colors">{tech.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="py-20 px-6 bg-gradient-to-r from-[#1E88E5] to-[#43A047] text-white">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl font-black mb-6">جاهز للبدء؟</h2>
-          <p className="text-xl mb-8 opacity-95">انضم إلى آلاف الأسر التي تستخدم تيسير AI</p>
-          <div className="flex gap-4 justify-center flex-wrap">
-            <Link href="/login" className="bg-white text-[#1E88E5] px-8 py-4 rounded-full text-xl font-bold hover:shadow-2xl transition-all">
-              🔐 ابدأ الآن
-            </Link>
-            <Link href="/dashboard" className="bg-transparent border-2 border-white text-white px-8 py-4 rounded-full text-xl font-bold hover:bg-white hover:text-[#1E88E5] transition-all">
-              📊 لوحة التحكم
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* <-- تم استبدال الفوتر البسيط بمكون الفوتر الاحترافي --> */}
-      <Footer />
-    </div>
+      <div className="text-center">
+        <Link
+          href="/scanner"
+          className="inline-block rounded-lg bg-blue-800 px-8 py-3 text-lg font-bold text-white hover:bg-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-800 dark:bg-blue-300 dark:text-blue-950 dark:hover:bg-blue-200 dark:focus-visible:outline-blue-300"
+        >
+          ابدأ المسح الذكي
+        </Link>
+      </div>
+    </main>
   );
 }

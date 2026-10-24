@@ -1,187 +1,231 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 
-interface ChildProfile {
+// ⚠️ بيانات تجريبية للعرض فقط. لا تُخزَّن هنا بيانات أطفال حقيقيين.
+// قبل استعمال بيانات حقيقية: موافقة ولي الأمر + تخزين آمن على السيرفر + حماية دخول حقيقية.
+
+type Skill = { name: string; value: number };
+type Activity = { date: string; title: string; result: string };
+type Child = {
   id: string;
   name: string;
   age: number;
   grade: string;
-  level: string;
-  parentName: string;
-}
+  lastSeen: string;
+  skills: Skill[];
+  activities: Activity[];
+  focus: string[];
+  note: string;
+};
+
+const CHILDREN: Child[] = [
+  {
+    id: 'ahmed',
+    name: 'أحمد',
+    age: 8,
+    grade: 'الصف الثالث',
+    lastSeen: 'أمس',
+    skills: [
+      { name: 'الإملاء', value: 62 },
+      { name: 'القراءة', value: 74 },
+      { name: 'تمييز الحروف المتشابهة', value: 48 },
+      { name: 'الكتابة اليدوية', value: 66 },
+    ],
+    activities: [
+      { date: '٢٤ أكتوبر', title: 'تمرين الإملاء', result: '٤ من ٥' },
+      { date: '٢٢ أكتوبر', title: 'تحليل ورقة كتابة', result: 'تقرير جاهز' },
+      { date: '٢٠ أكتوبر', title: 'لعبة الحروف', result: '١٢ من ١٥' },
+    ],
+    focus: ['التفريق بين ذ وز', 'كتابة الهمزة في وسط الكلمة'],
+    note: 'يتحسن عندما يقرأ الكلمة بصوت مرتفع قبل كتابتها. جلسات قصيرة من ١٠ دقائق تناسبه أكثر.',
+  },
+  {
+    id: 'fatima',
+    name: 'فاطمة',
+    age: 7,
+    grade: 'الصف الثاني',
+    lastSeen: 'قبل ٣ أيام',
+    skills: [
+      { name: 'الإملاء', value: 81 },
+      { name: 'القراءة', value: 88 },
+      { name: 'تمييز الحروف المتشابهة', value: 70 },
+      { name: 'الكتابة اليدوية', value: 59 },
+    ],
+    activities: [
+      { date: '٢٣ أكتوبر', title: 'تمرين الإملاء', result: '٥ من ٥' },
+      { date: '٢١ أكتوبر', title: 'لعبة الحروف', result: '١٤ من ١٥' },
+      { date: '١٨ أكتوبر', title: 'تحليل ورقة كتابة', result: 'تقرير جاهز' },
+    ],
+    focus: ['انتظام حجم الحروف على السطر', 'اتصال الحروف داخل الكلمة'],
+    note: 'قراءتها قوية. الأفضل التركيز على تمارين الكتابة اليدوية وتتبع الحروف.',
+  },
+];
+
+const focusRing =
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-800 dark:focus-visible:outline-blue-300';
+
+const card =
+  'rounded-3xl border border-slate-300 bg-white p-6 shadow-lg dark:border-slate-700 dark:bg-[#1a1a2e]';
+const h2 = 'mb-4 text-xl font-bold text-slate-900 dark:text-white';
+const linkBtn = `inline-block rounded-xl bg-blue-800 px-5 py-3 text-lg font-bold text-white transition-colors hover:bg-blue-900 dark:bg-blue-300 dark:text-blue-950 dark:hover:bg-blue-200 ${focusRing}`;
 
 export default function UsersPage() {
-  const [profiles, setProfiles] = useState<ChildProfile[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    age: '',
-    grade: '',
-    level: 'مبتدئ',
-    parentName: ''
-  });
-
-  useEffect(() => {
-    const saved = localStorage.getItem('taysir_profiles');
-    if (saved) {
-      setProfiles(JSON.parse(saved));
-    } else {
-      const sampleProfiles: ChildProfile[] = [
-        {
-          id: '1',
-          name: 'أحمد محمد',
-          age: 8,
-          grade: 'الثالث الابتدائي',
-          level: 'متوسط',
-          parentName: 'محمد أحمد'
-        },
-        {
-          id: '2',
-          name: 'فاطمة علي',
-          age: 7,
-          grade: 'الثاني الابتدائي',
-          level: 'مبتدئ',
-          parentName: 'علي حسن'
-        }
-      ];
-      setProfiles(sampleProfiles);
-      localStorage.setItem('taysir_profiles', JSON.stringify(sampleProfiles));
-    }
-  }, []);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newProfile: ChildProfile = {
-      id: Date.now().toString(),
-      name: formData.name,
-      age: parseInt(formData.age),
-      grade: formData.grade,
-      level: formData.level,
-      parentName: formData.parentName
-    };
-    const updated = [...profiles, newProfile];
-    setProfiles(updated);
-    localStorage.setItem('taysir_profiles', JSON.stringify(updated));
-    setFormData({ name: '', age: '', grade: '', level: 'مبتدئ', parentName: '' });
-    setShowForm(false);
-  };
-
-  const deleteProfile = (id: string) => {
-    const updated = profiles.filter(p => p.id !== id);
-    setProfiles(updated);
-    localStorage.setItem('taysir_profiles', JSON.stringify(updated));
-  };
+  const [selectedId, setSelectedId] = useState(CHILDREN[0].id);
+  const child = CHILDREN.find((c) => c.id === selectedId) ?? CHILDREN[0];
 
   return (
-    <div className="min-h-screen bg-[#FDF6E3] py-12 px-6" dir="rtl">
-      <div className="max-w-5xl mx-auto">
-        <Link href="/" className="inline-block mb-6 text-[#1E88E5] text-xl font-bold hover:underline">
-          ← العودة للرئيسية
-        </Link>
+    <main className="mx-auto max-w-5xl space-y-6 p-6 py-10">
+      <header>
+        <h1 className="text-3xl font-black text-blue-800 dark:text-blue-300 md:text-4xl">
+          ملفات الأطفال
+        </h1>
+        <p className="mt-2 text-lg text-slate-800 dark:text-gray-200">
+          اختر الطفل لعرض تقدمه وآخر نشاطاته.
+        </p>
+      </header>
 
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-5xl font-black text-[#8E24AA]">المستخدمون</h1>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="bg-[#8E24AA] text-white px-6 py-3 rounded-2xl text-xl font-bold hover:bg-[#6A1B9A] transition-all"
-          >
-            {showForm ? 'إلغاء' : '+ مستخدم جديد'}
-          </button>
-        </div>
-
-        {showForm && (
-          <div className="bg-white rounded-3xl shadow-2xl p-8 mb-8">
-            <h2 className="text-3xl font-bold text-[#8E24AA] mb-6">إنشاء ملف مستخدم جديد</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  required
-                  placeholder="اسم الطفل"
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="p-4 border-2 border-gray-200 rounded-xl text-lg focus:border-[#8E24AA] focus:outline-none"
-                />
-                <input
-                  type="number"
-                  required
-                  placeholder="العمر"
-                  value={formData.age}
-                  onChange={(e) => setFormData({...formData, age: e.target.value})}
-                  className="p-4 border-2 border-gray-200 rounded-xl text-lg focus:border-[#8E24AA] focus:outline-none"
-                />
-                <input
-                  type="text"
-                  required
-                  placeholder="الصف الدراسي"
-                  value={formData.grade}
-                  onChange={(e) => setFormData({...formData, grade: e.target.value})}
-                  className="p-4 border-2 border-gray-200 rounded-xl text-lg focus:border-[#8E24AA] focus:outline-none"
-                />
-                <select
-                  value={formData.level}
-                  onChange={(e) => setFormData({...formData, level: e.target.value})}
-                  className="p-4 border-2 border-gray-200 rounded-xl text-lg focus:border-[#8E24AA] focus:outline-none"
-                >
-                  <option value="مبتدئ">مبتدئ</option>
-                  <option value="متوسط">متوسط</option>
-                  <option value="متقدم">متقدم</option>
-                </select>
-                <input
-                  type="text"
-                  required
-                  placeholder="اسم ولي الأمر"
-                  value={formData.parentName}
-                  onChange={(e) => setFormData({...formData, parentName: e.target.value})}
-                  className="p-4 border-2 border-gray-200 rounded-xl text-lg focus:border-[#8E24AA] focus:outline-none md:col-span-2"
-                />
-              </div>
-              <button type="submit" className="w-full bg-[#8E24AA] text-white py-4 rounded-2xl text-xl font-bold hover:bg-[#6A1B9A] transition-all">
-                حفظ الملف
-              </button>
-            </form>
-          </div>
-        )}
-
-        <div className="grid md:grid-cols-2 gap-6">
-          {profiles.map((profile) => (
-            <div key={profile.id} className="bg-white rounded-3xl shadow-xl p-6 hover:scale-105 transition-transform">
-              <div className="flex justify-between items-start mb-4">
-                <div className="text-6xl">👶</div>
-                <button
-                  onClick={() => deleteProfile(profile.id)}
-                  className="text-[#E53935] hover:text-[#C62828] text-xl"
-                >
-                  🗑️
-                </button>
-              </div>
-              <h3 className="text-2xl font-bold text-[#8E24AA] mb-2">{profile.name}</h3>
-              <div className="space-y-2 text-[#2C3E50]">
-                <p className="text-lg">🎂 العمر: <span className="font-bold">{profile.age} سنوات</span></p>
-                <p className="text-lg">🎓 الصف: <span className="font-bold">{profile.grade}</span></p>
-                <p className="text-lg">📊 المستوى: <span className="font-bold">{profile.level}</span></p>
-                <p className="text-lg">‍👩‍👧 ولي الأمر: <span className="font-bold">{profile.parentName}</span></p>
-              </div>
-              <div className="mt-4 flex gap-2">
-                <Link href="/scanner" className="flex-1 bg-[#1E88E5] text-white py-2 rounded-xl text-center font-bold hover:bg-[#1565C0]">
-                  📸 تحليل
-                </Link>
-                <Link href="/exercises" className="flex-1 bg-[#43A047] text-white py-2 rounded-xl text-center font-bold hover:bg-[#2E7D32]">
-                   تمارين
-                </Link>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {profiles.length === 0 && (
-          <div className="bg-white rounded-3xl shadow-xl p-12 text-center">
-            <div className="text-8xl mb-4">📭</div>
-            <p className="text-2xl text-[#2C3E50]">لا توجد ملفات بعد. اضغط "مستخدم جديد" للبدء!</p>
-          </div>
-        )}
+      <div
+        role="note"
+        className="rounded-2xl border-2 border-amber-700 bg-amber-50 p-4 text-amber-950 dark:border-amber-300 dark:bg-amber-950 dark:text-amber-100"
+      >
+        هذه بيانات تجريبية للعرض، وليست لأطفال حقيقيين.
       </div>
-    </div>
+
+      <nav aria-label="اختيار الطفل">
+        <ul className="flex flex-wrap gap-3">
+          {CHILDREN.map((c) => {
+            const active = c.id === child.id;
+            return (
+              <li key={c.id}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedId(c.id)}
+                  aria-pressed={active}
+                  className={`flex items-center gap-3 rounded-2xl border-2 px-5 py-3 text-lg font-bold transition-colors ${focusRing} ${
+                    active
+                      ? 'border-blue-800 bg-blue-800 text-white dark:border-blue-300 dark:bg-blue-300 dark:text-blue-950'
+                      : 'border-slate-500 bg-white text-slate-900 hover:bg-slate-100 dark:border-gray-400 dark:bg-[#1a1a2e] dark:text-white dark:hover:bg-[#252540]'
+                  }`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`flex h-9 w-9 items-center justify-center rounded-full text-base ${
+                      active
+                        ? 'bg-white text-blue-800 dark:bg-blue-950 dark:text-blue-300'
+                        : 'bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-200'
+                    }`}
+                  >
+                    {c.name.charAt(0)}
+                  </span>
+                  {c.name}
+                  {active && <span className="sr-only"> (المحدد)</span>}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+
+      <section aria-labelledby="child-name" className={card}>
+        <h2 id="child-name" className="text-2xl font-black text-slate-900 dark:text-white">
+          {child.name}
+        </h2>
+        <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2 text-slate-800 dark:text-gray-200">
+          <div className="flex gap-2">
+            <dt className="font-bold">العمر:</dt>
+            <dd>{child.age} سنوات</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="font-bold">المرحلة:</dt>
+            <dd>{child.grade}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="font-bold">آخر نشاط:</dt>
+            <dd>{child.lastSeen}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <section aria-labelledby="skills-title" className={card}>
+          <h2 id="skills-title" className={h2}>
+            مستوى المهارات
+          </h2>
+          <ul className="space-y-4">
+            {child.skills.map((s) => (
+              <li key={s.name}>
+                <div className="mb-1 flex justify-between font-semibold text-slate-900 dark:text-white">
+                  <span>{s.name}</span>
+                  <span>{s.value}%</span>
+                </div>
+                <div
+                  role="progressbar"
+                  aria-label={s.name}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={s.value}
+                  className="h-4 w-full overflow-hidden rounded-full bg-slate-300 dark:bg-slate-700"
+                >
+                  <div
+                    className="h-4 rounded-full bg-blue-800 dark:bg-blue-300"
+                    style={{ width: `${s.value}%` }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section aria-labelledby="activity-title" className={card}>
+          <h2 id="activity-title" className={h2}>
+            آخر النشاطات
+          </h2>
+          <ul className="divide-y divide-slate-300 dark:divide-slate-700">
+            {child.activities.map((a) => (
+              <li key={`${a.date}-${a.title}`} className="flex items-center justify-between gap-4 py-3">
+                <div>
+                  <p className="font-bold text-slate-900 dark:text-white">{a.title}</p>
+                  <p className="text-sm text-slate-700 dark:text-gray-300">{a.date}</p>
+                </div>
+                <p className="font-bold text-blue-800 dark:text-blue-300">{a.result}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <section aria-labelledby="focus-title" className={card}>
+          <h2 id="focus-title" className={h2}>
+            ما يحتاج تدريبًا
+          </h2>
+          <ul className="list-disc space-y-2 ps-5 leading-loose text-slate-800 marker:text-orange-700 dark:text-gray-200">
+            {child.focus.map((f) => (
+              <li key={f}>{f}</li>
+            ))}
+          </ul>
+        </section>
+
+        <section aria-labelledby="note-title" className={card}>
+          <h2 id="note-title" className={h2}>
+            ملاحظة للمتابعة
+          </h2>
+          <p className="leading-loose text-slate-800 dark:text-gray-200">{child.note}</p>
+          <p className="mt-3 text-sm text-slate-700 dark:text-gray-300">
+            هذه ملاحظات تدريب وليست تشخيصًا. لأي قلق يُنصح بمراجعة أخصائي صعوبات تعلم معتمد.
+          </p>
+        </section>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <Link href="/exercises" className={linkBtn}>
+          ابدأ تمرينًا
+        </Link>
+        <Link href="/scanner" className={linkBtn}>
+          حلّل ورقة كتابة
+        </Link>
+      </div>
+    </main>
   );
 }
