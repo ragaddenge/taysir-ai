@@ -30,8 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files (keys must never be committed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -40,5 +41,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-.vercel
-.env.local
+# command output and stray files
+lint.txt
+*.exe
