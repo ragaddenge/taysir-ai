@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { notifyAuthChange } from '../hooks/useAuth';
 
 // ⚠️ تسجيل دخول تجريبي للعرض فقط، ولا يوفّر أي حماية حقيقية.
 // يعمل فقط عند ضبط NEXT_PUBLIC_DEMO_MODE=true في .env.local.
@@ -82,11 +83,13 @@ export default function LoginPage() {
         JSON.stringify({ email: user.email, name: user.name, loginTime: new Date().toISOString() }),
       );
     } catch {
-      setError('تعذّر حفظ جلسة الدخول. أوقف التصفح الخاص وحاول مرة أخرى.');
+      setError('تعذّر حفظ جلسة الدخول. تحقق من إعدادات المتصفح وحاول مرة أخرى.');
       setIsLoading(false);
       return;
     }
 
+    // يُعلم useAuth والشريط العلوي بالجلسة الجديدة فورًا
+    notifyAuthChange();
     router.push('/dashboard');
   };
 

@@ -104,8 +104,9 @@ export default function AnalysisReport({ report, imageSrc }: Props) {
   const copyTimer = useRef<number | null>(null);
 
   // التاريخ يُحسب مرة واحدة (استدعاء Date داخل الرسم يخالف قواعد lint الحديثة)
+  // الأرقام لاتينية لتتسق مع بقية أرقام التقرير
   const [date] = useState(() =>
-    new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' }),
+    new Date().toLocaleDateString('ar-EG-u-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' }),
   );
 
   // عند الطباعة يُزال الوضع الداكن مؤقتًا، وإلا خرج النص أبيض على ورقة بيضاء
@@ -253,7 +254,7 @@ export default function AnalysisReport({ report, imageSrc }: Props) {
                   </div>
                   <div
                     aria-hidden="true"
-                    className="h-4 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"
+                    className="h-4 w-full overflow-hidden rounded-full bg-slate-300 dark:bg-slate-700"
                   >
                     <div
                       className="h-4 rounded-full bg-linear-to-l from-orange-700 to-pink-700"
@@ -273,6 +274,9 @@ export default function AnalysisReport({ report, imageSrc }: Props) {
           <h3 id="writing-title" className={h3}>
             ملاحظات على شكل الكتابة
           </h3>
+          <p className="-mt-2 mb-4 text-sm text-slate-700 dark:text-gray-300">
+            كلما امتلأ الشريط زادت الحاجة للمتابعة.
+          </p>
           <ul className="grid gap-5 md:grid-cols-2">
             {report.writing.map((w, i) => {
               const idx = levelIndex[w.level] ?? 2;
@@ -286,7 +290,7 @@ export default function AnalysisReport({ report, imageSrc }: Props) {
                     {[1, 2, 3].map((s) => (
                       <span
                         key={s}
-                        className={`h-3 flex-1 rounded-full ${s <= idx ? levelColor[idx] : 'bg-slate-200 dark:bg-slate-700'}`}
+                        className={`h-3 flex-1 rounded-full ${s <= idx ? levelColor[idx] : 'bg-slate-300 dark:bg-slate-700'}`}
                       />
                     ))}
                   </div>
