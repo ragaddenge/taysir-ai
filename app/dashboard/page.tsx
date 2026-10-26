@@ -68,7 +68,7 @@ function Icon({ name, className = 'h-6 w-6' }: { name: IconName; className?: str
 }
 
 // ---------- البيانات التجريبية ----------
-const CHILD_NAME = 'أحمد محمد';
+const CHILD_NAME = 'أحمد';
 
 const weeklyProgress = [
   { day: 'السبت', score: 75 },
@@ -272,7 +272,7 @@ export default function DashboardPage() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="mb-2 text-3xl font-black md:text-4xl">مرحبًا {user.name}!</h1>
-            <p className="text-xl">مثال لملخص تقدم {CHILD_NAME} هذا الأسبوع</p>
+            <p className="text-xl">مثال لملخص تقدم الطفل {CHILD_NAME} هذا الأسبوع</p>
           </div>
           <div className="flex flex-wrap items-center gap-4">
             <div className="rounded-2xl bg-white/20 p-6 text-center">

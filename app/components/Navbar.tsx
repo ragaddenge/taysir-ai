@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../hooks/useAuth';
 
 const navLinks = [
   { href: '/', label: 'الرئيسية' },
@@ -21,9 +22,14 @@ const SUN_PATH =
   'M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z';
 const MOON_PATH =
   'M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z';
+const LOGOUT_PATH =
+  'M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9';
 
 const focusRing =
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-800 dark:focus-visible:outline-blue-400';
+
+const primaryBtn =
+  'rounded-xl border border-white/30 bg-gradient-to-br from-blue-600 to-indigo-700 text-base font-black text-white shadow-lg shadow-blue-700/30 backdrop-blur-md transition hover:from-blue-500 hover:to-indigo-600 hover:shadow-blue-700/50';
 
 function Icon({ d, className = 'h-5 w-5' }: { d: string; className?: string }) {
   return (
@@ -44,6 +50,9 @@ export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const { toggleDarkMode } = useTheme();
   const pathname = usePathname();
+  // redirect:false لأن الشريط يظهر في كل الصفحات العامة ولا يجب أن يحوّل الزائر
+  const { user, checked, logout } = useAuth({ redirect: false });
+  const loggedIn = checked && !!user;
 
   const isActive = (href: string) =>
     href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/');
@@ -52,6 +61,11 @@ export default function Navbar() {
     isActive(href)
       ? 'border border-blue-600/40 bg-blue-600/15 font-extrabold text-blue-900 shadow-sm backdrop-blur-md dark:border-blue-400/40 dark:bg-blue-400/20 dark:text-blue-200'
       : 'border border-transparent font-bold text-gray-800 hover:border-gray-300/70 hover:bg-white/60 hover:backdrop-blur-md dark:text-gray-200 dark:hover:border-white/15 dark:hover:bg-white/10 dark:hover:text-white';
+
+  const handleLogout = () => {
+    setIsOpen(false);
+    logout();
+  };
 
   return (
     <nav
@@ -102,12 +116,30 @@ export default function Navbar() {
               </span>
             </button>
 
-            <Link
-              href="/dashboard"
-              className={`hidden rounded-xl border border-white/30 bg-gradient-to-br from-blue-600 to-indigo-700 px-5 py-2 text-base font-black text-white shadow-lg shadow-blue-700/30 backdrop-blur-md transition hover:from-blue-500 hover:to-indigo-600 hover:shadow-blue-700/50 lg:block ${focusRing}`}
-            >
-              تسجيل الدخول
-            </Link>
+            {loggedIn ? (
+              <>
+                <Link
+                  href="/users"
+                  aria-current={isActive('/users') ? 'page' : undefined}
+                  className={`hidden px-5 py-2 lg:block ${primaryBtn} ${focusRing}`}
+                >
+                  ملفات الأطفال
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  aria-label="تسجيل الخروج"
+                  title="تسجيل الخروج"
+                  className={`hidden h-10 w-10 items-center justify-center rounded-xl border border-red-700/40 bg-red-600/10 text-red-800 backdrop-blur-md transition-colors hover:bg-red-600/20 dark:border-red-300/40 dark:bg-red-400/15 dark:text-red-200 lg:flex ${focusRing}`}
+                >
+                  <Icon d={LOGOUT_PATH} />
+                </button>
+              </>
+            ) : (
+              <Link href="/login" className={`hidden px-5 py-2 lg:block ${primaryBtn} ${focusRing}`}>
+                تسجيل الدخول
+              </Link>
+            )}
 
             <button
               type="button"
@@ -124,10 +156,7 @@ export default function Navbar() {
 
         {/* قائمة الموبايل */}
         {isOpen && (
-          <div
-            id="mobile-menu"
-            className="border-t border-white/40 py-3 dark:border-white/10 lg:hidden"
-          >
+          <div id="mobile-menu" className="border-t border-white/40 py-3 dark:border-white/10 lg:hidden">
             <ul className="space-y-1">
               {navLinks.map((link) => (
                 <li key={link.href}>
@@ -142,13 +171,34 @@ export default function Navbar() {
                 </li>
               ))}
             </ul>
-            <Link
-              href="/dashboard"
-              onClick={() => setIsOpen(false)}
-              className={`mt-3 block rounded-xl border border-white/30 bg-gradient-to-br from-blue-600 to-indigo-700 py-3 text-center text-base font-black text-white shadow-lg shadow-blue-700/30 transition hover:from-blue-500 hover:to-indigo-600 ${focusRing}`}
-            >
-              تسجيل الدخول
-            </Link>
+
+            {loggedIn ? (
+              <div className="mt-3 space-y-2">
+                <Link
+                  href="/users"
+                  onClick={() => setIsOpen(false)}
+                  className={`block py-3 text-center ${primaryBtn} ${focusRing}`}
+                >
+                  ملفات الأطفال
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className={`flex w-full items-center justify-center gap-2 rounded-xl border-2 border-red-700 py-3 text-base font-black text-red-800 transition-colors hover:bg-red-50 dark:border-red-300 dark:text-red-200 dark:hover:bg-red-950 ${focusRing}`}
+                >
+                  <Icon d={LOGOUT_PATH} />
+                  تسجيل الخروج
+                </button>
+              </div>
+            ) : (
+              <Link
+                href="/login"
+                onClick={() => setIsOpen(false)}
+                className={`mt-3 block py-3 text-center ${primaryBtn} ${focusRing}`}
+              >
+                تسجيل الدخول
+              </Link>
+            )}
           </div>
         )}
       </div>
