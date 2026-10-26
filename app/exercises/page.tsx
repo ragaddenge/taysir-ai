@@ -9,12 +9,32 @@ interface Exercise {
   answer: string;
 }
 
+// عدد الأسئلة في كل جولة
+const ROUND_SIZE = 5;
+
+// بنك الأسئلة: يُختار منه ROUND_SIZE سؤالًا عشوائيًا في كل جولة.
+// يلزم أن يراجعه معلم أو مختص لغة عربية قبل الاستعمال مع الأطفال.
 const EXERCISES: Exercise[] = [
   { question: 'اختر الكلمة الصحيحة إملائيًا:', options: ['هاذا', 'هذا', 'هاذه', 'هاذ'], answer: 'هذا' },
   { question: 'أي كلمة مكتوبة بشكل صحيح؟', options: ['مدرسه', 'مدرسة', 'مدرست', 'مدرصة'], answer: 'مدرسة' },
   { question: 'اختر الكلمة المكتوبة بشكل صحيح:', options: ['دهب', 'ذهب', 'ذهت', 'دهت'], answer: 'ذهب' },
   { question: 'أي كلمة مكتوبة بشكل صحيح؟', options: ['حديقه', 'حديقة', 'حديقت', 'حديفة'], answer: 'حديقة' },
   { question: 'اختر الكلمة المكتوبة بشكل صحيح:', options: ['الشمس', 'الشمش', 'السمس', 'الشمص'], answer: 'الشمس' },
+  { question: 'أي كلمة مكتوبة بشكل صحيح؟', options: ['مكتبه', 'مكتبة', 'مكتبت', 'مكتبا'], answer: 'مكتبة' },
+  { question: 'اختر الكلمة المكتوبة بشكل صحيح:', options: ['معلمه', 'معلمة', 'معلمت', 'معلما'], answer: 'معلمة' },
+  { question: 'أي كلمة مكتوبة بشكل صحيح؟', options: ['نضيف', 'نظيف', 'نذيف', 'نظيب'], answer: 'نظيف' },
+  { question: 'اختر الكلمة المكتوبة بشكل صحيح:', options: ['كتاب', 'كتاد', 'قتاب', 'كتات'], answer: 'كتاب' },
+  { question: 'أي كلمة مكتوبة بشكل صحيح؟', options: ['سعلب', 'ثعلب', 'تعلب', 'ذعلب'], answer: 'ثعلب' },
+  { question: 'اختر الكلمة المكتوبة بشكل صحيح:', options: ['سماء', 'سمأ', 'سماأ', 'سمإ'], answer: 'سماء' },
+  { question: 'أي كلمة مكتوبة بشكل صحيح؟', options: ['ارنب', 'أرنب', 'إرنب', 'ءرنب'], answer: 'أرنب' },
+  { question: 'اختر الكلمة المكتوبة بشكل صحيح:', options: ['سوال', 'سؤال', 'سئال', 'سأال'], answer: 'سؤال' },
+  { question: 'أي كلمة مكتوبة بشكل صحيح؟', options: ['مستشفا', 'مستشفى', 'مستشفي', 'مستشفة'], answer: 'مستشفى' },
+  { question: 'اختر الكلمة المكتوبة بشكل صحيح:', options: ['موسا', 'موسى', 'موسي', 'موسه'], answer: 'موسى' },
+  { question: 'أي كلمة مكتوبة بشكل صحيح؟', options: ['تالب', 'طالب', 'دالب', 'ظالب'], answer: 'طالب' },
+  { question: 'اختر الكلمة المكتوبة بشكل صحيح:', options: ['سديق', 'صديق', 'زديق', 'صديك'], answer: 'صديق' },
+  { question: 'أي كلمة مكتوبة بشكل صحيح؟', options: ['غابه', 'غابة', 'قابة', 'غابت'], answer: 'غابة' },
+  { question: 'اختر الكلمة المكتوبة بشكل صحيح:', options: ['حبز', 'خبز', 'غبز', 'خبس'], answer: 'خبز' },
+  { question: 'أي كلمة مكتوبة بشكل صحيح؟', options: ['ذالك', 'ذلك', 'دلك', 'ضلك'], answer: 'ذلك' },
 ];
 
 function shuffle<T>(array: T[]): T[] {
@@ -26,8 +46,11 @@ function shuffle<T>(array: T[]): T[] {
   return a;
 }
 
+// جولة جديدة: ROUND_SIZE سؤالًا عشوائيًا من البنك، وخيارات كل سؤال مخلوطة
 const shuffledSet = (): Exercise[] =>
-  shuffle(EXERCISES).map((e) => ({ ...e, options: shuffle(e.options) }));
+  shuffle(EXERCISES)
+    .slice(0, ROUND_SIZE)
+    .map((e) => ({ ...e, options: shuffle(e.options) }));
 
 // ---------- أيقونات SVG ----------
 const ICONS = {
@@ -75,9 +98,9 @@ function resultInfo(percentage: number) {
 }
 
 export default function ExercisesPage() {
-  // الخلط يتم عند الضغط على «ابدأ» فقط، فلا حاجة لـ setState داخل effect
-  // ولا يحدث اختلاف بين السيرفر والمتصفح (hydration).
-  const [items, setItems] = useState<Exercise[]>(EXERCISES);
+  // الخلط والاختيار العشوائي يتمان عند الضغط على «ابدأ» فقط، فلا حاجة لـ setState
+  // داخل effect، ولا يحدث اختلاف بين السيرفر والمتصفح (hydration).
+  const [items, setItems] = useState<Exercise[]>(EXERCISES.slice(0, ROUND_SIZE));
   const [started, setStarted] = useState(false);
   const [current, setCurrent] = useState(0);
   const [score, setScore] = useState(0);
@@ -128,7 +151,7 @@ export default function ExercisesPage() {
             التمارين التفاعلية
           </h1>
           <p className="mb-8 text-xl text-slate-700 dark:text-gray-300 md:text-2xl">
-            {EXERCISES.length} أسئلة إملائية بسيطة. خذ وقتك في القراءة، ولا يوجد وقت محدد.
+            {ROUND_SIZE} أسئلة إملائية بسيطة تتغير في كل مرة. خذ وقتك في القراءة، ولا يوجد وقت محدد.
           </p>
           <button onClick={begin} className={`${bigBtn} ${btnBlue}`}>
             ابدأ التمرين
@@ -159,7 +182,7 @@ export default function ExercisesPage() {
           <div className="space-y-4">
             <button onClick={begin} className={`${bigBtn} ${btnBlue}`}>
               <Icon name="refresh" />
-              إعادة التمارين
+              جولة جديدة
             </button>
             <Link href="/games" className={`${bigBtn} ${btnRed}`}>
               <Icon name="arrow" />
@@ -246,22 +269,20 @@ export default function ExercisesPage() {
           {/* رسالة التصحيح تبقى حتى يضغط الطفل «التالي» */}
           <div role="status" aria-live="polite">
             {answered && (
-              <>
-                <div
-                  className={`mt-6 flex items-center justify-center gap-3 rounded-xl border-2 p-4 text-center text-xl font-bold md:text-2xl ${
-                    isCorrect
-                      ? 'border-green-800 bg-green-50 text-green-900 dark:border-green-300 dark:bg-green-950 dark:text-green-200'
-                      : 'border-red-700 bg-red-50 text-red-900 dark:border-red-300 dark:bg-red-950 dark:text-red-200'
-                  }`}
-                >
-                  <Icon name={isCorrect ? 'check' : 'cross'} className="h-7 w-7 shrink-0" />
-                  <span>
-                    {isCorrect
-                      ? 'إجابة صحيحة! أحسنت!'
-                      : `إجابة خاطئة، الإجابة الصحيحة: ${exercise.answer}`}
-                  </span>
-                </div>
-              </>
+              <div
+                className={`mt-6 flex items-center justify-center gap-3 rounded-xl border-2 p-4 text-center text-xl font-bold md:text-2xl ${
+                  isCorrect
+                    ? 'border-green-800 bg-green-50 text-green-900 dark:border-green-300 dark:bg-green-950 dark:text-green-200'
+                    : 'border-red-700 bg-red-50 text-red-900 dark:border-red-300 dark:bg-red-950 dark:text-red-200'
+                }`}
+              >
+                <Icon name={isCorrect ? 'check' : 'cross'} className="h-7 w-7 shrink-0" />
+                <span>
+                  {isCorrect
+                    ? 'إجابة صحيحة! أحسنت!'
+                    : `إجابة خاطئة، الإجابة الصحيحة: ${exercise.answer}`}
+                </span>
+              </div>
             )}
           </div>
 
