@@ -1,103 +1,47 @@
-import { NextResponse } from 'next/server';
-import { Resend } from 'resend';
+﻿import { NextRequest, NextResponse } from 'next/server';
 
-const MAX = { name: 100, email: 200, subject: 50, message: 3000 };
+export const runtime = 'nodejs';
 
-const SUBJECT_LABELS: Record<string, string> = {
-  استفسار: 'استفسار عام',
-  حساب: 'طلب إنشاء حساب',
-  دعم: 'دعم فني',
-  اقتراح: 'اقتراح تحسين',
-};
-
-// منع حقن HTML في الإيميل
-const esc = (s: string) =>
-  s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-
-// حماية بسيطة من الإرسال المتكرر (في الذاكرة، كفاية للعرض)
-const hits = new Map<string, number[]>();
-function tooMany(ip: string) {
-  const now = Date.now();
-  const recent = (hits.get(ip) ?? []).filter((t) => now - t < 10 * 60 * 1000);
-  recent.push(now);
-  hits.set(ip, recent);
-  return recent.length > 5; // 5 رسايل كل 10 دقايق
-}
-
-export async function POST(req: Request) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const to = process.env.CONTACT_TO_EMAIL;
-  if (!apiKey || !to) {
-    console.error('[contact] RESEND_API_KEY أو CONTACT_TO_EMAIL مش متضافين');
-    return NextResponse.json({ error: 'خدمة الإرسال غير مفعّلة حالياً' }, { status: 500 });
-  }
-
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
-  if (tooMany(ip)) {
-    return NextResponse.json({ error: 'محاولات كثيرة، حاول بعد قليل' }, { status: 429 });
-  }
-
-  let body: Record<string, unknown>;
+export async function POST(req: NextRequest) {
   try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'بيانات غير صالحة' }, { status: 400 });
-  }
+    const { imageBase64, fileName } = await req.json();
+    if (!imageBase64) return NextResponse.json({ error: 'Ù„Ø§ ØªÙˆØ¬Ø¯ ØµÙˆØ±Ø©' }, { status: 400 });
 
-  const name = String(body.name ?? '').trim();
-  const email = String(body.email ?? '').trim();
-  const subject = String(body.subject ?? '').trim();
-  const message = String(body.message ?? '').trim();
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) return NextResponse.json({ error: 'Ù…ÙØªØ§Ø­ API ØºÙŠØ± Ù…Ø¶Ø¨ÙˆØ·' }, { status: 500 });
 
-  if (!name || !email || !subject || !message) {
-    return NextResponse.json({ error: 'يرجى ملء جميع الحقول' }, { status: 400 });
-  }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return NextResponse.json({ error: 'البريد الإلكتروني غير صالح' }, { status: 400 });
-  }
-  if (
-    name.length > MAX.name ||
-    email.length > MAX.email ||
-    subject.length > MAX.subject ||
-    message.length > MAX.message
-  ) {
-    return NextResponse.json({ error: 'النص أطول من المسموح' }, { status: 400 });
-  }
+    const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
+    const mimeType = imageBase64.match(/data:(image\/\w+);base64/)?.[1] || 'image/jpeg';
 
-  const label = SUBJECT_LABELS[subject] ?? 'أخرى';
+    const prompt = `Ø£Ù†Øª Ø®Ø¨ÙŠØ± ÙÙŠ ØªØ´Ø®ÙŠØµ Ø¹Ø³Ø± Ø§Ù„ÙƒØªØ§Ø¨Ø© (Ø§Ù„Ø¯Ø³Ù„ÙƒØ³ÙŠØ§) Ù„Ø¯Ù‰ Ø§Ù„Ø£Ø·ÙØ§Ù„. Ø­Ù„Ù„ ØµÙˆØ±Ø© ÙˆØ±Ù‚Ø© Ø§Ù„ÙƒØªØ§Ø¨Ø© Ø§Ù„Ø¹Ø±Ø¨ÙŠØ© ÙˆØ£Ø¹Ø·Ù ØªÙ‚Ø±ÙŠØ±Ø§Ù‹ Ø¨ØµÙŠØºØ© JSON ÙÙ‚Ø· Ø¨Ø¯ÙˆÙ† Ø£ÙŠ Ù†Øµ Ø¢Ø®Ø±:
+{"overallScore":0,"diagnosis":"Ù†Øµ","strengths":["Ù†Øµ"],"weaknesses":["Ù†Øµ"],"spellingErrors":[{"word":"Ù†Øµ","correction":"Ù†Øµ","type":"Ù†Øµ"}],"recommendations":["Ù†Øµ"],"exercises":[{"title":"Ù†Øµ","description":"Ù†Øµ","level":"Ø³Ù‡Ù„","duration":"10 Ø¯Ù‚Ø§Ø¦Ù‚"}]}`;
 
-  try {
-    const resend = new Resend(apiKey);
-    const { error } = await resend.emails.send({
-      // بدون دومين موثّق، Resend بيسمح بالمرسل ده للتجربة فقط
-      from: 'تيسير AI <onboarding@resend.dev>',
-      to,
-      replyTo: email, // لما تضغط Reply يرد على المرسل مباشرة
-      subject: `[تيسير AI] ${label} - ${name}`,
-      html: `
-        <div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.8">
-          <h2>رسالة جديدة من نموذج التواصل</h2>
-          <p><strong>الاسم:</strong> ${esc(name)}</p>
-          <p><strong>البريد:</strong> ${esc(email)}</p>
-          <p><strong>الموضوع:</strong> ${esc(label)}</p>
-          <hr />
-          <p style="white-space:pre-wrap">${esc(message)}</p>
-        </div>
-      `,
-    });
+    const response = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64Data } }] }],
+        }),
+      }
+    );
 
-    if (error) {
-      console.error('[contact] Resend error:', error);
-      return NextResponse.json({ error: 'تعذّر إرسال الرسالة، حاول لاحقاً' }, { status: 502 });
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('âŒ Gemini:', response.status, errText);
+      throw new Error(`Gemini (${response.status})`);
     }
-  } catch (err) {
-    console.error('[contact] unexpected:', err);
-    return NextResponse.json({ error: 'حدث خطأ غير متوقع' }, { status: 500 });
-  }
 
-  return NextResponse.json({ ok: true });
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('Ù„Ù… ÙŠØªÙ… Ø§Ø³ØªØ®Ø±Ø§Ø¬ JSON');
+
+    return NextResponse.json({ success: true, fileName, analysis: JSON.parse(jsonMatch[0]) });
+
+  } catch (error: any) {
+    console.error('âŒ Ø®Ø·Ø£:', error);
+    return NextResponse.json({ error: 'ØªØ¹Ø°Ù‘Ø± Ø§Ù„ØªØ­Ù„ÙŠÙ„', details: error.message }, { status: 500 });
+  }
 }

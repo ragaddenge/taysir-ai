@@ -1,312 +1,306 @@
 'use client';
 
-import { useState, useSyncExternalStore } from 'react';
-import AnalysisReport, { type Report } from '../components/AnalysisReport';
-
-const PROFILES_KEY = 'taysir_profiles';
-const MAX_FILE_BYTES = 15 * 1024 * 1024; // 15MB
-
-// أيقونات SVG بدل الإيموجي (نفس أسلوب الصفحة الرئيسية)
-const ICONS = {
-  upload:
-    'M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5',
-  search:
-    'M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z',
-  close: 'M6 18L18 6M6 6l12 12',
-  warning:
-    'M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z',
-  check: 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
-};
-
-function Icon({ name, className }: { name: keyof typeof ICONS; className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-      strokeWidth={1.8}
-      aria-hidden="true"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d={ICONS[name]} />
-    </svg>
-  );
-}
-
-// تصغير الصورة قبل الإرسال (أسرع، وتبقى تحت حد حجم الطلب)
-function compressImage(dataUrl: string, maxSide = 1600, quality = 0.85): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
-      const w = Math.round(img.width * scale);
-      const h = Math.round(img.height * scale);
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        reject(new Error('تعذّر تجهيز الصورة'));
-        return;
-      }
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, w, h);
-      ctx.drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL('image/jpeg', quality));
-    };
-    img.onerror = () => reject(new Error('تعذّر قراءة الصورة، جرّب صورة بصيغة JPG أو PNG'));
-    img.src = dataUrl;
-  });
-}
-
-// اسم الطفل يُقرأ محليًا من المتصفح للعرض فقط، ولا يُرسل مع الصورة
-function subscribeChild(callback: () => void) {
-  window.addEventListener('storage', callback);
-  return () => window.removeEventListener('storage', callback);
-}
-
-function getChildName(): string | null {
-  try {
-    const childId = new URLSearchParams(window.location.search).get('child');
-    if (!childId) return null;
-    const saved = localStorage.getItem(PROFILES_KEY);
-    if (!saved) return null;
-    const list: unknown = JSON.parse(saved);
-    if (!Array.isArray(list)) return null;
-    const found = list.find((p) => p && p.id === childId);
-    return found && typeof found.name === 'string' ? found.name : null;
-  } catch {
-    // تخزين غير متاح أو بيانات تالفة: نتجاهل
-    return null;
-  }
-}
+import { useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function ScannerPage() {
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [analysis, setAnalysis] = useState<Report | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [progress, setProgress] = useState(0);
-  const [status, setStatus] = useState('');
-  const [consent, setConsent] = useState(false);
-  const childName = useSyncExternalStore(subscribeChild, getChildName, () => null);
+  const router = useRouter();
+  const [image, setImage] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string>('');
+  const [agreed, setAgreed] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const reset = () => {
-    setSelectedImage(null);
-    setAnalysis(null);
-    setError('');
-    setProgress(0);
-    setStatus('');
-    setConsent(false);
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target;
-    const file = input.files?.[0];
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      setError('من فضلك اختر ملف صورة صالح');
-      input.value = '';
-      return;
-    }
-
-    if (file.size > MAX_FILE_BYTES) {
-      setError('حجم الصورة كبير جداً. اختر صورة أقل من 15 ميجابايت');
-      input.value = '';
-      return;
-    }
-
+    setFileName(file.name);
     const reader = new FileReader();
     reader.onloadend = () => {
-      if (typeof reader.result !== 'string') return;
-      setSelectedImage(reader.result);
-      setAnalysis(null);
-      setError('');
-      setProgress(0);
+      const base64 = reader.result as string;
+      console.log('✅ تم تحميل الصورة:', base64.substring(0, 50) + '...');
+      setImage(base64);
+      setError(null);
+      setResult(null);
     };
-    reader.onerror = () => setError('تعذّر قراءة الملف، جرّب صورة أخرى');
     reader.readAsDataURL(file);
-    input.value = ''; // يسمح باختيار الملف نفسه مرة أخرى
   };
 
-  const analyzeImage = async () => {
-    if (!selectedImage || !consent) return;
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
 
-    setLoading(true);
-    setError('');
-    setAnalysis(null);
-    setProgress(10);
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      console.log('✅ تم تحميل الصورة (drag):', base64.substring(0, 50) + '...');
+      setImage(base64);
+      setError(null);
+      setResult(null);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const startAnalysis = async () => {
+    if (!image) {
+      setError('لا توجد صورة');
+      return;
+    }
+
+    if (!agreed) {
+      setError('يرجى الموافقة على الشروط أولاً');
+      return;
+    }
+
+    setAnalyzing(true);
+    setError(null);
+    setResult(null);
+
+    console.log('📤 بدء إرسال الصورة للتحليل...');
+    console.log('📏 حجم الصورة:', image.length, 'character');
+    console.log('📝 اسم الملف:', fileName);
 
     try {
-      setStatus('جاري تجهيز الصورة...');
-      const compressed = await compressImage(selectedImage);
-      setProgress(35);
-
-      setStatus('جاري التحليل بالذكاء الاصطناعي...');
-      setProgress(55);
-
       const response = await fetch('/api/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: compressed }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageBase64: image,
+          fileName: fileName,
+        }),
       });
 
-      let data: { report?: Report; error?: string } = {};
-      try {
-        data = await response.json();
-      } catch {
-        // الرد ليس بصيغة JSON (مثلاً تجاوز الحد الأقصى لحجم الطلب)
-      }
-      if (!response.ok) throw new Error(data.error || 'فشل التحليل');
-      if (!data.report) throw new Error('رد غير متوقع من الخدمة');
+      console.log('📥 استلام الرد:', response.status);
 
-      setAnalysis(data.report);
-      setProgress(100);
-      setStatus('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'حدث خطأ');
+      const data = await response.json();
+      console.log('📄 محتوى الرد:', data);
+
+      if (!response.ok) {
+        throw new Error(data.details || data.error || 'فشل التحليل');
+      }
+
+      setResult(data.analysis);
+    } catch (err: any) {
+      console.error('❌ خطأ:', err);
+      setError(err.message || 'تعذّر إكمال التحليل');
     } finally {
-      setLoading(false);
+      setAnalyzing(false);
     }
   };
 
   return (
-    <main className="px-4 py-12">
-      <div className="mx-auto max-w-6xl">
-        <div className="mb-10 text-center">
-          <h1 className="mb-3 text-3xl font-black text-slate-900 dark:text-white md:text-4xl">
-            الماسح الذكي لخط اليد
+    <div className="min-h-screen bg-gray-900 py-8" dir="rtl">
+      <div className="max-w-3xl mx-auto px-4">
+        
+        {/* العنوان */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-blue-400 mb-2">
+            📷 الماسح الذكي
           </h1>
-          <p className="text-lg text-slate-700 dark:text-gray-300">
-            تحليل بصري لخط اليد بالذكاء الاصطناعي
+          <p className="text-gray-300">
+            ارفع صورة ورقة الكتابة ودع الذكاء الاصطناعي يحلل الأخطاء
           </p>
-          {childName && (
-            <p className="mt-3 inline-block rounded-full border border-slate-300 bg-slate-50 px-4 py-1 text-base font-bold text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-100">
-              الطفل: {childName}
-            </p>
-          )}
         </div>
 
-        <div className="mx-auto mb-8 max-w-4xl rounded-3xl border border-slate-300 bg-white p-8 shadow-lg dark:border-slate-700 dark:bg-[#1a1a2e]">
-          {!selectedImage ? (
-            <label className="group flex h-64 w-full cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-400 transition-colors hover:border-blue-700 hover:bg-blue-50 focus-within:border-blue-700 focus-within:ring-2 focus-within:ring-blue-700 dark:border-slate-500 dark:hover:border-blue-300 dark:hover:bg-slate-800 dark:focus-within:border-blue-300 dark:focus-within:ring-blue-300">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="sr-only"
+        {/* منطقة رفع الصورة */}
+        <div
+          onDrop={handleDrop}
+          onDragOver={(e) => e.preventDefault()}
+          onClick={() => fileInputRef.current?.click()}
+          className="border-4 border-dashed border-blue-400 rounded-2xl p-8 text-center cursor-pointer hover:bg-gray-800 transition-colors bg-gray-800 shadow-lg mb-6"
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+
+          {image ? (
+            <div>
+              <img
+                src={image}
+                alt="معاينة"
+                className="max-h-96 mx-auto rounded-lg shadow-md mb-4"
               />
-              <Icon
-                name="upload"
-                className="mb-4 h-14 w-14 text-slate-700 transition-transform group-hover:scale-110 motion-reduce:transition-none motion-reduce:group-hover:scale-100 dark:text-gray-200"
-              />
-              <p className="text-xl font-bold text-slate-800 dark:text-gray-100">
-                اضغط لرفع صورة ورقة الكتابة
-              </p>
-              <p className="mt-2 px-4 text-center text-sm font-bold text-slate-700 dark:text-gray-300">
-                تُرسل الصورة إلى خدمة ذكاء اصطناعي خارجية (Google Gemini) لتحليلها. تجنّب
-                الصور التي تحتوي على اسم الطفل.
-              </p>
-            </label>
+              <p className="text-sm text-gray-400">{fileName}</p>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setImage(null);
+                  setFileName('');
+                  setResult(null);
+                }}
+                className="mt-3 text-red-400 hover:underline text-sm"
+              >
+                ❌ حذف الصورة
+              </button>
+            </div>
           ) : (
-            <div className="space-y-6">
-              <div className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={selectedImage}
-                  alt="صورة ورقة الكتابة المرفوعة"
-                  className="max-h-96 w-full rounded-2xl border border-slate-300 bg-slate-50 object-contain dark:border-slate-700 dark:bg-[#0f0f1e]"
-                />
-                <button
-                  onClick={reset}
-                  disabled={loading}
-                  aria-label="إزالة الصورة"
-                  className="absolute left-4 top-4 rounded-full bg-red-700 p-2 text-white shadow-lg hover:bg-red-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Icon name="close" className="h-5 w-5" />
-                </button>
-              </div>
-
-              {!analysis && !loading && (
-                <>
-                  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-300 bg-slate-50 p-4 text-sm font-bold leading-relaxed text-slate-800 focus-within:ring-2 focus-within:ring-blue-700 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200 dark:focus-within:ring-blue-300">
-                    <input
-                      type="checkbox"
-                      checked={consent}
-                      onChange={(e) => setConsent(e.target.checked)}
-                      className="mt-1 h-5 w-5 shrink-0 accent-blue-800"
-                    />
-                    <span>
-                      أوافق على إرسال هذه الصورة إلى Google Gemini لتحليلها. وأعلم أن الخدمة
-                      المستخدمة مجانية، وأن Google قد تستخدم المحتوى المرسَل لتحسين خدماتها،
-                      وقد يطّلع عليه مراجعون بشريون. وأؤكد أن الصورة لا تحتوي على اسم الطفل
-                      أو بيانات تعريفية، وأن ولي الأمر موافق على رفعها.
-                    </span>
-                  </label>
-                  <button
-                    onClick={analyzeImage}
-                    disabled={!consent}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-800 py-4 text-lg font-bold text-white shadow-lg transition-colors hover:bg-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-300 dark:text-blue-950 dark:hover:bg-blue-200 dark:focus-visible:outline-blue-300"
-                  >
-                    <Icon name="search" className="h-6 w-6" />
-                    بدء التحليل الذكي
-                  </button>
-                </>
-              )}
-
-              {loading && (
-                <div className="space-y-3" role="status" aria-live="polite">
-                  <div className="flex justify-between text-sm font-semibold text-slate-800 dark:text-gray-200">
-                    <span>{status}</span>
-                    <span>{progress}%</span>
-                  </div>
-                  <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-                    <div
-                      className="h-3 rounded-full bg-blue-800 transition-all duration-300 motion-reduce:transition-none dark:bg-blue-300"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {error && (
-            <div
-              role="alert"
-              className="mt-6 flex items-center gap-2 rounded-xl border-2 border-red-700 bg-red-50 p-4 font-semibold text-red-900 dark:border-red-400 dark:bg-red-950 dark:text-red-200"
-            >
-              <Icon name="warning" className="h-6 w-6 shrink-0" />
-              <span>{error}</span>
+            <div>
+              <div className="text-6xl mb-4">📤</div>
+              <p className="text-lg font-bold text-gray-300 mb-2">
+                اضغط لاختيار صورة أو اسحبها هنا
+              </p>
+              <p className="text-sm text-gray-500">PNG, JPG, WEBP حتى 10MB</p>
             </div>
           )}
         </div>
 
-        {analysis && (
-          <div className="space-y-6">
-            <div
-              role="status"
-              className="flex items-center gap-3 rounded-2xl border-2 border-green-700 bg-green-50 p-5 text-green-950 dark:border-green-300 dark:bg-green-950 dark:text-green-100"
-            >
-              <Icon name="check" className="h-9 w-9 shrink-0" />
-              <div>
-                <h2 className="text-xl font-bold">اكتمل التحليل</h2>
-                <p className="text-sm">النتيجة أولية وتحتاج مراجعة مختص، وليست تشخيصاً.</p>
-              </div>
+        {/* الموافقة */}
+        {image && (
+          <div className="mb-6 bg-gray-800 rounded-xl p-4 border border-gray-700">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+                className="mt-1 w-5 h-5 accent-blue-500"
+              />
+              <span className="text-sm text-gray-300 leading-relaxed">
+                أوافق على إرسال هذه الصورة إلى Google Gemini لتحليلها. وأعلم أن الخدمة المستخدمة مجانية، وأن Google قد تستخدم المحتوى المرسل لتحسين خدماتها، وقد يطلع عليه مراجعون بشريون. وأؤكد أن الصورة <strong>لا تحتوي على اسم الطفل أو بيانات تعريفية</strong>، وأن ولي الأمر موافق على رفعها.
+              </span>
+            </label>
+          </div>
+        )}
+
+        {/* زر التحليل */}
+        {image && (
+          <button
+            onClick={startAnalysis}
+            disabled={!agreed || analyzing}
+            className={`w-full py-4 rounded-xl text-xl font-bold transition-all shadow-lg mb-4 ${
+              !agreed || analyzing
+                ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                : 'bg-blue-500 hover:bg-blue-600 text-white hover:scale-[1.02]'
+            }`}
+          >
+            {analyzing ? '⏳ جارٍ التحليل الذكي...' : '🧠 بدء التحليل الذكي'}
+          </button>
+        )}
+
+        {/* رسالة الخطأ */}
+        {error && (
+          <div className="mb-4 bg-red-900/30 border-2 border-red-500 text-red-300 rounded-xl p-4 flex items-center gap-3">
+            <span className="text-2xl">⚠️</span>
+            <div>
+              <p className="font-bold">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {/* نتيجة التحليل */}
+        {result && (
+          <div className="mt-8 bg-gray-800 rounded-2xl p-6 shadow-xl border border-gray-700">
+            <h2 className="text-2xl font-bold text-green-400 mb-4">
+              ✅ نتيجة التحليل
+            </h2>
+
+            {/* الدقة العامة */}
+            <div className="bg-blue-900/30 rounded-xl p-4 mb-4 text-center">
+              <p className="text-gray-400 mb-1">الدقة العامة</p>
+              <p className="text-5xl font-bold text-blue-400">
+                {result.overallScore}%
+              </p>
             </div>
 
-            <AnalysisReport report={analysis} imageSrc={selectedImage} />
+            {/* التشخيص */}
+            {result.diagnosis && (
+              <div className="mb-4">
+                <h3 className="font-bold text-lg mb-2 text-gray-200">
+                  🔍 التشخيص
+                </h3>
+                <p className="text-gray-300">{result.diagnosis}</p>
+              </div>
+            )}
+
+            {/* نقاط القوة */}
+            {result.strengths?.length > 0 && (
+              <div className="mb-4">
+                <h3 className="font-bold text-lg mb-2 text-green-400">💪 نقاط القوة</h3>
+                <ul className="list-disc pr-6 text-gray-300 space-y-1">
+                  {result.strengths.map((s: string, i: number) => (
+                    <li key={i}>{s}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* نقاط الضعف */}
+            {result.weaknesses?.length > 0 && (
+              <div className="mb-4">
+                <h3 className="font-bold text-lg mb-2 text-red-400">⚠️ نقاط الضعف</h3>
+                <ul className="list-disc pr-6 text-gray-300 space-y-1">
+                  {result.weaknesses.map((w: string, i: number) => (
+                    <li key={i}>{w}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* الأخطاء الإملائية */}
+            {result.spellingErrors?.length > 0 && (
+              <div className="mb-4">
+                <h3 className="font-bold text-lg mb-2 text-orange-400">✏️ الأخطاء الإملائية</h3>
+                <div className="space-y-2">
+                  {result.spellingErrors.map((e: any, i: number) => (
+                    <div key={i} className="bg-orange-900/20 p-3 rounded-lg">
+                      <p className="text-red-400 line-through">{e.word}</p>
+                      <p className="text-green-400">← {e.correction}</p>
+                      <p className="text-xs text-gray-500">{e.type}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* التوصيات */}
+            {result.recommendations?.length > 0 && (
+              <div className="mb-4">
+                <h3 className="font-bold text-lg mb-2 text-purple-400">💡 التوصيات</h3>
+                <ul className="list-disc pr-6 text-gray-300 space-y-1">
+                  {result.recommendations.map((r: string, i: number) => (
+                    <li key={i}>{r}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* التمارين الموصى بها */}
+            {result.exercises?.length > 0 && (
+              <div className="mb-4">
+                <h3 className="font-bold text-lg mb-2 text-blue-400">🎯 تمارين موصى بها</h3>
+                <div className="grid gap-3">
+                  {result.exercises.map((ex: any, i: number) => (
+                    <div key={i} className="bg-blue-900/20 p-4 rounded-lg">
+                      <p className="font-bold text-gray-200">{ex.title}</p>
+                      <p className="text-sm text-gray-300">{ex.description}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        📊 {ex.level} • ⏱️ {ex.duration}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <button
-              onClick={reset}
-              className="mx-auto block w-full max-w-md rounded-xl bg-slate-800 py-4 font-bold text-white shadow-lg transition-colors hover:bg-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-800 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-white dark:focus-visible:outline-slate-200 print:hidden"
+              onClick={() => router.push('/exercises')}
+              className="mt-6 w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-xl font-bold transition-all"
             >
-              تحليل صورة جديدة
+              🎯 ابدأ التمارين العلاجية
             </button>
           </div>
         )}
       </div>
-    </main>
+    </div>
   );
 }
