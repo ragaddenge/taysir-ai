@@ -3,6 +3,9 @@
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
+// حد أمان لحجم الصورة: طلبات Vercel محدودة (~4.5MB) والتحويل لـ base64 يزيد الحجم ~33%
+const MAX_FILE_BYTES = 3 * 1024 * 1024;
+
 export default function ScannerPage() {
   const router = useRouter();
   const [image, setImage] = useState<string | null>(null);
@@ -13,37 +16,37 @@ export default function ScannerPage() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // النتيجة قابلة للاستخدام فقط لو الدرجة أكبر من صفر (الصفر معناه صورة غير قابلة للتحليل)
+  const hasValidResult =
+    !!result && typeof result.overallScore === 'number' && result.overallScore > 0;
+
+  const loadFile = (file: File) => {
+    if (file.size > MAX_FILE_BYTES) {
+      setError('حجم الصورة كبير. اختر صورة أصغر من 3 ميجابايت.');
+      return;
+    }
 
     setFileName(file.name);
     const reader = new FileReader();
     reader.onloadend = () => {
-      const base64 = reader.result as string;
-      console.log('✅ تم تحميل الصورة:', base64.substring(0, 50) + '...');
-      setImage(base64);
+      setImage(reader.result as string);
       setError(null);
       setResult(null);
     };
     reader.readAsDataURL(file);
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    loadFile(file);
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
-
-    setFileName(file.name);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result as string;
-      console.log('✅ تم تحميل الصورة (drag):', base64.substring(0, 50) + '...');
-      setImage(base64);
-      setError(null);
-      setResult(null);
-    };
-    reader.readAsDataURL(file);
+    loadFile(file);
   };
 
   const startAnalysis = async () => {
@@ -61,10 +64,6 @@ export default function ScannerPage() {
     setError(null);
     setResult(null);
 
-    console.log('📤 بدء إرسال الصورة للتحليل...');
-    console.log('📏 حجم الصورة:', image.length, 'character');
-    console.log('📝 اسم الملف:', fileName);
-
     try {
       const response = await fetch('/api/analyze', {
         method: 'POST',
@@ -77,18 +76,15 @@ export default function ScannerPage() {
         }),
       });
 
-      console.log('📥 استلام الرد:', response.status);
-
       const data = await response.json();
-      console.log('📄 محتوى الرد:', data);
 
       if (!response.ok) {
-        throw new Error(data.details || data.error || 'فشل التحليل');
+        console.error('❌ فشل التحليل:', data.details || data.error);
+        throw new Error('تعذّر إكمال التحليل. حاول مرة أخرى بعد قليل.');
       }
 
       setResult(data.analysis);
     } catch (err: any) {
-      console.error('❌ خطأ:', err);
       setError(err.message || 'تعذّر إكمال التحليل');
     } finally {
       setAnalyzing(false);
@@ -150,7 +146,7 @@ export default function ScannerPage() {
               <p className="text-lg font-bold text-gray-300 mb-2">
                 اضغط لاختيار صورة أو اسحبها هنا
               </p>
-              <p className="text-sm text-gray-500">PNG, JPG, WEBP حتى 10MB</p>
+              <p className="text-sm text-gray-500">PNG, JPG, WEBP حتى 3MB</p>
             </div>
           )}
         </div>
@@ -197,26 +193,48 @@ export default function ScannerPage() {
           </div>
         )}
 
+        {/* صورة غير قابلة للتحليل */}
+        {result && !hasValidResult && (
+          <div className="mt-8 bg-gray-800 rounded-2xl p-6 shadow-xl border-2 border-amber-500">
+            <h2 className="text-2xl font-bold text-amber-400 mb-4">
+              ⚠️ تعذّر تحليل هذه الصورة
+            </h2>
+            {result.diagnosis && (
+              <p className="text-gray-300 mb-4">{result.diagnosis}</p>
+            )}
+            {result.recommendations?.length > 0 && (
+              <ul className="list-disc pr-6 text-gray-300 space-y-1 mb-4">
+                {result.recommendations.map((r: string, i: number) => (
+                  <li key={i}>{r}</li>
+                ))}
+              </ul>
+            )}
+            <p className="text-sm text-gray-400">
+              جرّب صورة واضحة لكتابة الطفل بخط اليد، بإضاءة جيدة وبدون ظلال.
+            </p>
+          </div>
+        )}
+
         {/* نتيجة التحليل */}
-        {result && (
+        {hasValidResult && (
           <div className="mt-8 bg-gray-800 rounded-2xl p-6 shadow-xl border border-gray-700">
             <h2 className="text-2xl font-bold text-green-400 mb-4">
               ✅ نتيجة التحليل
             </h2>
 
-            {/* الدقة العامة */}
+            {/* وضوح الكتابة */}
             <div className="bg-blue-900/30 rounded-xl p-4 mb-4 text-center">
-              <p className="text-gray-400 mb-1">الدقة العامة</p>
+              <p className="text-gray-400 mb-1">وضوح الكتابة في هذه الورقة</p>
               <p className="text-5xl font-bold text-blue-400">
                 {result.overallScore}%
               </p>
             </div>
 
-            {/* التشخيص */}
+            {/* ملخص الملاحظات */}
             {result.diagnosis && (
               <div className="mb-4">
                 <h3 className="font-bold text-lg mb-2 text-gray-200">
-                  🔍 التشخيص
+                  🔍 ملخص الملاحظات
                 </h3>
                 <p className="text-gray-300">{result.diagnosis}</p>
               </div>
@@ -234,10 +252,10 @@ export default function ScannerPage() {
               </div>
             )}
 
-            {/* نقاط الضعف */}
+            {/* ملاحظات للتحسين */}
             {result.weaknesses?.length > 0 && (
               <div className="mb-4">
-                <h3 className="font-bold text-lg mb-2 text-red-400">⚠️ نقاط الضعف</h3>
+                <h3 className="font-bold text-lg mb-2 text-red-400">⚠️ ملاحظات للتحسين</h3>
                 <ul className="list-disc pr-6 text-gray-300 space-y-1">
                   {result.weaknesses.map((w: string, i: number) => (
                     <li key={i}>{w}</li>
@@ -292,11 +310,15 @@ export default function ScannerPage() {
               </div>
             )}
 
+            <p className="mt-4 text-xs text-gray-400">
+              هذه نتيجة أولية وتعليمية، وليست تشخيصاً طبياً أو تربوياً. لو عندك قلق على الطفل، راجع مختصاً.
+            </p>
+
             <button
               onClick={() => router.push('/exercises')}
               className="mt-6 w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-xl font-bold transition-all"
             >
-              🎯 ابدأ التمارين العلاجية
+              🎯 ابدأ التمارين التدريبية
             </button>
           </div>
         )}
