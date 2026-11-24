@@ -1,19 +1,19 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
-export const maxDuration = 30; // تقليل الوقت الأقصى إلى 30 ثانية
+export const maxDuration = 30;
 
 const SYSTEM_PROMPT = 'أنت مساعد طبي متخصص باللغة العربية. يجب أن ترد باللغة العربية الفصحى فقط في جميع الردود. ممنوع استخدام أي لغة أخرى. كل القيم في الـ JSON يجب أن تكون بالعربية الفصحى.';
 
 const USER_PROMPT = 'أنت خبير في تشخيص عسر الكتابة (الدسلكسيا) لدى الأطفال. حلل صورة ورقة الكتابة العربية وأعط تقريرا بصيغة JSON فقط باللغة العربية الفصحى بدون أي نص آخر وبدون markdown: {"overallScore":0,"diagnosis":"تشخيص بالعربية","strengths":["نقطة قوة بالعربية"],"weaknesses":["نقطة ضعف بالعربية"],"spellingErrors":[{"word":"كلمة خاطئة بالعربية","correction":"الصحيح بالعربية","type":"نوع الخطأ بالعربية"}],"recommendations":["توصية بالعربية"],"exercises":[{"title":"اسم التمرين بالعربية","description":"الوصف بالعربية","level":"سهل أو متوسط أو متقدم","duration":"10 دقائق"}]}';
 
-// 🟢 المحرك الأساسي: Gemini 1.5 Flash (أسرع من 2.0)
+// 🟢 المحرك الأساسي: Gemini 1.5 Flash
 async function analyzeWithGemini(base64Data: string, mimeType: string) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('مفتاح Gemini غير مضبوط');
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000); // timeout 10 ثوانٍ
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
 
   try {
     const response = await fetch(
@@ -29,8 +29,8 @@ async function analyzeWithGemini(base64Data: string, mimeType: string) {
             ],
           }],
           generationConfig: {
-            temperature: 0.3, // تقليل للعشوائية = استجابة أسرع
-            maxOutputTokens: 512, // تقليل عدد التوكنات = استجابة أسرع
+            temperature: 0.3,
+            maxOutputTokens: 512,
             responseMimeType: 'application/json',
           },
         }),
@@ -49,20 +49,18 @@ async function analyzeWithGemini(base64Data: string, mimeType: string) {
     return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
   } catch (error: any) {
     clearTimeout(timeoutId);
-    if (error.name === 'AbortError') {
-      throw new Error('Gemini timeout - تحويل إلى Groq');
-    }
+    if (error.name === 'AbortError') throw new Error('Gemini timeout');
     throw error;
   }
 }
 
-// 🟡 المحرك الاحتياطي: Groq مع Llama 3.2 Vision (أسرع من Qwen)
+// 🟡 المحرك الاحتياطي: Groq (نفس النموذج الذي كان يعمل)
 async function analyzeWithGroq(base64Data: string, mimeType: string) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('مفتاح Groq غير مضبوط');
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000); // timeout 8 ثوانٍ
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -72,7 +70,7 @@ async function analyzeWithGroq(base64Data: string, mimeType: string) {
         'Authorization': 'Bearer ' + apiKey,
       },
       body: JSON.stringify({
-        model: 'llama-3.2-90b-vision-preview', // نموذج أسرع وأخف
+        model: 'qwen/qwen3.8-27b', // ✅ النموذج الأصلي الذي كان يعمل
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           {
@@ -101,9 +99,7 @@ async function analyzeWithGroq(base64Data: string, mimeType: string) {
     return data.choices?.[0]?.message?.content || '';
   } catch (error: any) {
     clearTimeout(timeoutId);
-    if (error.name === 'AbortError') {
-      throw new Error('Groq timeout');
-    }
+    if (error.name === 'AbortError') throw new Error('Groq timeout');
     throw error;
   }
 }
@@ -119,18 +115,17 @@ export async function POST(req: NextRequest) {
     let text = '';
     let provider = '';
 
-    // 🟢 المحاولة الأولى: Gemini 1.5 Flash (الأسرع)
+    // 🟢 المحاولة الأولى: Gemini (الأساسي)
     try {
       console.log('✅ بدء التحليل عبر Gemini 1.5 Flash...');
       text = await analyzeWithGemini(base64Data, mimeType);
       provider = 'Gemini 1.5 Flash';
       console.log('✅ التحليل نجح عبر Gemini');
     } catch (geminiError: any) {
-      // 🟡 الفشل في Gemini → التحويل التلقائي إلى Groq
       console.warn('⚠️ فشل Gemini، تحويل تلقائي إلى Groq:', geminiError.message);
       text = await analyzeWithGroq(base64Data, mimeType);
-      provider = 'Groq Llama 3.2';
-      console.log('✅ التحليل نجح عبر Groq');
+      provider = 'Groq Qwen 3.8';
+      console.log('✅ التحليل نجح عبر Groq (Failover)');
     }
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
