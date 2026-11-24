@@ -3,34 +3,49 @@
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
-const SYSTEM_PROMPT = 'أنت مساعد طبي متخصص باللغة العربية. يجب أن ترد باللغة العربية الفصحى فقط في جميع الردود. ممنوع استخدام أي لغة أخرى. كل القيم في الـ JSON يجب أن تكون بالعربية الفصحى.';
+const SYSTEM_PROMPT =
+  'أنت مساعد تعليمي متخصص في ملاحظة الكتابة اليدوية العربية لدى الأطفال. ترد باللغة العربية الفصحى فقط، وكل القيم في الـ JSON يجب أن تكون بالعربية الفصحى. أنت لا تشخّص أي حالة طبية أو تعليمية، ولا تذكر أن الطفل مصاب بالدسلكسيا أو بأي اضطراب، ولا تقترح علاجاً. مهمتك وصف ما يظهر في الكتابة فقط وتقديم ملاحظات وتمارين تدريبية بسيطة.';
 
-const USER_PROMPT = 'أنت خبير في تشخيص عسر الكتابة (الدسلكسيا) لدى الأطفال. حلل صورة ورقة الكتابة العربية وأعط تقريرا بصيغة JSON فقط باللغة العربية الفصحى بدون أي نص آخر وبدون markdown: {"overallScore":0,"diagnosis":"تشخيص بالعربية","strengths":["نقطة قوة بالعربية"],"weaknesses":["نقطة ضعف بالعربية"],"spellingErrors":[{"word":"كلمة خاطئة بالعربية","correction":"الصحيح بالعربية","type":"نوع الخطأ بالعربية"}],"recommendations":["توصية بالعربية"],"exercises":[{"title":"اسم التمرين بالعربية","description":"الوصف بالعربية","level":"سهل أو متوسط أو متقدم","duration":"10 دقائق"}]}';
+const USER_PROMPT =
+  'حلل صورة ورقة الكتابة العربية وأعط تقريراً بصيغة JSON فقط، بالعربية الفصحى، بدون أي نص آخر وبدون markdown. ' +
+  'القواعد: (1) overallScore رقم من 0 إلى 100 يعبّر عن وضوح الكتابة وسلامتها الإملائية في هذه الورقة فقط، وليس تقييماً للطفل. ' +
+  '(2) حقل diagnosis يجب أن يكون ملخصاً عاماً للملاحظات على الكتابة، بدون أي تشخيص وبدون ذكر الدسلكسيا أو أي اضطراب. ' +
+  '(3) استخدم عبارات مثل "تظهر مؤشرات محتملة" أو "لوحظ"، وليس عبارات جازمة. ' +
+  '(4) اجعل آخر توصية في recommendations تنصح بمراجعة مختص إذا استمر القلق. ' +
+  '(5) إذا كانت الصورة غير مقروءة أو ليست كتابة عربية، اجعل overallScore يساوي 0، واشرح السبب في diagnosis، واترك باقي القوائم فارغة. ' +
+  'الشكل المطلوب: {"overallScore":0,"diagnosis":"ملخص الملاحظات بالعربية","strengths":["نقطة قوة بالعربية"],"weaknesses":["ملاحظة على الكتابة بالعربية"],"spellingErrors":[{"word":"كلمة خاطئة بالعربية","correction":"الصحيح بالعربية","type":"نوع الخطأ بالعربية"}],"recommendations":["توصية بالعربية"],"exercises":[{"title":"اسم التمرين بالعربية","description":"الوصف بالعربية","level":"سهل أو متوسط أو متقدم","duration":"10 دقائق"}]}';
 
-// 🟢 المحرك الأساسي: Gemini 1.5 Flash
+// 🟢 المحرك الأساسي: Gemini (اسم الموديل من المتغير GEMINI_MODEL، والافتراضي أدناه)
 async function analyzeWithGemini(base64Data: string, mimeType: string) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('مفتاح Gemini غير مضبوط');
 
+  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const timeoutId = setTimeout(() => controller.abort(), 14000);
 
   try {
     const response = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + apiKey,
+      'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
         body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: SYSTEM_PROMPT + '\n\n' + USER_PROMPT },
-              { inlineData: { mimeType: mimeType, data: base64Data } },
-            ],
-          }],
+          contents: [
+            {
+              parts: [
+                { text: SYSTEM_PROMPT + '\n\n' + USER_PROMPT },
+                { inlineData: { mimeType: mimeType, data: base64Data } },
+              ],
+            },
+          ],
           generationConfig: {
             temperature: 0.3,
-            maxOutputTokens: 512,
+            maxOutputTokens: 1500,
             responseMimeType: 'application/json',
           },
         }),
@@ -54,23 +69,23 @@ async function analyzeWithGemini(base64Data: string, mimeType: string) {
   }
 }
 
-// 🟡 المحرك الاحتياطي: Groq (نفس النموذج الذي كان يعمل)
+// 🟡 المحرك الاحتياطي: Groq
 async function analyzeWithGroq(base64Data: string, mimeType: string) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('مفتاح Groq غير مضبوط');
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  const timeoutId = setTimeout(() => controller.abort(), 12000);
 
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + apiKey,
+        Authorization: 'Bearer ' + apiKey,
       },
       body: JSON.stringify({
-        model: 'qwen/qwen3.8-27b', // ✅ النموذج الأصلي الذي كان يعمل
+        model: 'qwen/qwen3.8-27b',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           {
@@ -82,7 +97,7 @@ async function analyzeWithGroq(base64Data: string, mimeType: string) {
           },
         ],
         temperature: 0.3,
-        max_completion_tokens: 512,
+        max_completion_tokens: 1500,
         response_format: { type: 'json_object' },
       }),
       signal: controller.signal,
@@ -117,14 +132,14 @@ export async function POST(req: NextRequest) {
 
     // 🟢 المحاولة الأولى: Gemini (الأساسي)
     try {
-      console.log('✅ بدء التحليل عبر Gemini 1.5 Flash...');
+      console.log('✅ بدء التحليل عبر Gemini...');
       text = await analyzeWithGemini(base64Data, mimeType);
-      provider = 'Gemini 1.5 Flash';
+      provider = 'Gemini';
       console.log('✅ التحليل نجح عبر Gemini');
     } catch (geminiError: any) {
       console.warn('⚠️ فشل Gemini، تحويل تلقائي إلى Groq:', geminiError.message);
       text = await analyzeWithGroq(base64Data, mimeType);
-      provider = 'Groq Qwen 3.8';
+      provider = 'Groq';
       console.log('✅ التحليل نجح عبر Groq (Failover)');
     }
 
@@ -134,7 +149,6 @@ export async function POST(req: NextRequest) {
     const analysis = JSON.parse(jsonMatch[0]);
 
     return NextResponse.json({ success: true, fileName, provider, analysis });
-
   } catch (error: any) {
     console.error('❌ خطأ:', error);
     return NextResponse.json({ error: 'تعذر التحليل', details: error.message }, { status: 500 });
