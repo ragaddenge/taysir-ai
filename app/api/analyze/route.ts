@@ -1,7 +1,7 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const SYSTEM_PROMPT =
   'أنت مساعد تعليمي متخصص في ملاحظة الكتابة اليدوية العربية لدى الأطفال. ترد باللغة العربية الفصحى فقط، وكل القيم في الـ JSON يجب أن تكون بالعربية الفصحى. أنت لا تشخّص أي حالة طبية أو تعليمية، ولا تذكر أن الطفل مصاب بالدسلكسيا أو بأي اضطراب، ولا تقترح علاجاً. مهمتك وصف ما يظهر في الكتابة فقط وتقديم ملاحظات وتمارين تدريبية بسيطة.';
@@ -23,7 +23,7 @@ async function analyzeWithGemini(base64Data: string, mimeType: string) {
   const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 14000);
+  const timeoutId = setTimeout(() => controller.abort(), 28000);
 
   try {
     const response = await fetch(
@@ -45,8 +45,12 @@ async function analyzeWithGemini(base64Data: string, mimeType: string) {
           ],
           generationConfig: {
             temperature: 0.3,
-            maxOutputTokens: 1500,
+            maxOutputTokens: 4096,
             responseMimeType: 'application/json',
+            // اختياري: لتسريع الموديلات التي تفكّر قبل الرد، ضع GEMINI_THINKING_LEVEL (مثل low) في Vercel
+            ...(process.env.GEMINI_THINKING_LEVEL
+              ? { thinkingConfig: { thinkingLevel: process.env.GEMINI_THINKING_LEVEL } }
+              : {}),
           },
         }),
         signal: controller.signal,
@@ -61,7 +65,12 @@ async function analyzeWithGemini(base64Data: string, mimeType: string) {
     }
 
     const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const finishReason = data.candidates?.[0]?.finishReason;
+    if (finishReason && finishReason !== 'STOP') {
+      console.warn('⚠️ Gemini finishReason:', finishReason);
+    }
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    return parts.map((p: any) => p.text || '').join('');
   } catch (error: any) {
     clearTimeout(timeoutId);
     if (error.name === 'AbortError') throw new Error('Gemini timeout');
@@ -75,7 +84,7 @@ async function analyzeWithGroq(base64Data: string, mimeType: string) {
   if (!apiKey) throw new Error('مفتاح Groq غير مضبوط');
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 12000);
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
 
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -97,7 +106,7 @@ async function analyzeWithGroq(base64Data: string, mimeType: string) {
           },
         ],
         temperature: 0.3,
-        max_completion_tokens: 1500,
+        max_completion_tokens: 2000,
         response_format: { type: 'json_object' },
       }),
       signal: controller.signal,
@@ -119,6 +128,12 @@ async function analyzeWithGroq(base64Data: string, mimeType: string) {
   }
 }
 
+function parseAnalysis(text: string) {
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('لم يتم استخراج JSON: ' + text.substring(0, 200));
+  return JSON.parse(jsonMatch[0]);
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { imageBase64, fileName } = await req.json();
@@ -127,26 +142,21 @@ export async function POST(req: NextRequest) {
     const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
     const mimeType = imageBase64.match(/data:(image\/\w+);base64/)?.[1] || 'image/jpeg';
 
-    let text = '';
+    let analysis: any;
     let provider = '';
 
-    // 🟢 المحاولة الأولى: Gemini (الأساسي)
+    // 🟢 المحاولة الأولى: Gemini (الأساسي). أي فشل (شبكة أو رد غير صالح) يحوّل تلقائياً إلى Groq
     try {
       console.log('✅ بدء التحليل عبر Gemini...');
-      text = await analyzeWithGemini(base64Data, mimeType);
+      analysis = parseAnalysis(await analyzeWithGemini(base64Data, mimeType));
       provider = 'Gemini';
       console.log('✅ التحليل نجح عبر Gemini');
     } catch (geminiError: any) {
       console.warn('⚠️ فشل Gemini، تحويل تلقائي إلى Groq:', geminiError.message);
-      text = await analyzeWithGroq(base64Data, mimeType);
+      analysis = parseAnalysis(await analyzeWithGroq(base64Data, mimeType));
       provider = 'Groq';
       console.log('✅ التحليل نجح عبر Groq (Failover)');
     }
-
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('لم يتم استخراج JSON: ' + text.substring(0, 200));
-
-    const analysis = JSON.parse(jsonMatch[0]);
 
     return NextResponse.json({ success: true, fileName, provider, analysis });
   } catch (error: any) {
