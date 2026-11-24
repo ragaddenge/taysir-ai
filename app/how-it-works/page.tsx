@@ -184,6 +184,7 @@ export default function HowItWorksPage() {
       </section>
 
       <div className="text-center">
+        
         <Link
           href="/scanner"
           className="inline-block rounded-lg bg-blue-800 px-8 py-3 text-lg font-bold text-white hover:bg-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-800 dark:bg-blue-300 dark:text-blue-950 dark:hover:bg-blue-200 dark:focus-visible:outline-blue-300"
