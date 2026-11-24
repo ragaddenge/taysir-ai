@@ -65,6 +65,10 @@ const technologies = [
     role: 'بناء الموقع وصفحاته',
   },
   {
+    name: 'Resend',
+    role: 'إرسال رسائل فورم التواصل',
+  },
+  {
     name: 'Vercel',
     role: 'استضافة الموقع',
   },
