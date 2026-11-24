@@ -44,3 +44,5 @@ next-env.d.ts
 # command output and stray files
 lint.txt
 *.exe
+.vercel
+.env*
