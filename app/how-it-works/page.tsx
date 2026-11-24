@@ -108,7 +108,7 @@ export default function HowItWorksPage() {
         </h2>
         <ul className="list-disc space-y-2 pr-5 leading-relaxed text-gray-800 dark:text-gray-200">
           <li>
-            صورة الكتابة بتتبعت لخدمة Google Gemini عشان تتحلل. ما ترفعش صور
+            صورة الكتابة بتتبعت لخدمة Google Gemini عشان تتحلل (ولو تعذّرت، بتتبعت تلقائياً لخدمة Groq كبديل). الموقع نفسه مش بيخزّن الصورة. ما ترفعش صور
             فيها اسم الطفل أو بيانات تعريفية.
           </li>
           <li>
