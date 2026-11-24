@@ -13,6 +13,7 @@ export default function ScannerPage() {
   const [agreed, setAgreed] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [provider, setProvider] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -63,6 +64,7 @@ export default function ScannerPage() {
     setAnalyzing(true);
     setError(null);
     setResult(null);
+    setProvider(null);
 
     try {
       const response = await fetch('/api/analyze', {
@@ -84,6 +86,7 @@ export default function ScannerPage() {
       }
 
       setResult(data.analysis);
+      setProvider(data.provider || null);
     } catch (err: any) {
       setError(err.message || 'تعذّر إكمال التحليل');
     } finally {
@@ -310,7 +313,13 @@ export default function ScannerPage() {
               </div>
             )}
 
-            <p className="mt-4 text-xs text-gray-400">
+            {provider && (
+              <p className="mt-4 text-xs text-gray-500">
+                تم التحليل عبر {provider}.
+              </p>
+            )}
+
+            <p className="mt-2 text-xs text-gray-400">
               هذه نتيجة أولية وتعليمية، وليست تشخيصاً طبياً أو تربوياً. لو عندك قلق على الطفل، راجع مختصاً.
             </p>
 
