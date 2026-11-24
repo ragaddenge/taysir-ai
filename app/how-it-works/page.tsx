@@ -21,7 +21,7 @@ const steps: Step[] = [
   {
     title: 'تقرير التحليل',
     description:
-      'Google Gemini بيقرأ خط اليد مباشرة من الصورة ويطلّع مؤشرات محتملة وملاحظات. لو الصورة مش مقروءة بتظهر لك رسالة واضحة بدل تقرير غلط.',
+      'Google Gemini بيقرأ خط اليد مباشرة من الصورة ويطلّع مؤشرات محتملة وملاحظات (ولو تعذّر، بيتحلل تلقائياً عبر Groq كبديل). لو الصورة مش مقروءة بتظهر لك رسالة واضحة بدل تقرير غلط.',
     status: 'available',
     href: '/scanner',
   },
@@ -57,16 +57,16 @@ const technologies = [
     role: 'قراءة خط اليد وتحليله من الصورة',
   },
   {
+    name: 'Groq',
+    role: 'بديل تلقائي لتحليل الصورة لو Gemini تعذّر',
+  },
+  {
     name: 'Next.js',
     role: 'بناء الموقع وصفحاته',
   },
   {
-    name: 'Resend',
-    role: 'إرسال رسائل فورم التواصل',
-  },
-  {
     name: 'Vercel',
-    role: 'استضافة الموقع (مخطط)',
+    role: 'استضافة الموقع',
   },
 ];
 
@@ -108,8 +108,9 @@ export default function HowItWorksPage() {
         </h2>
         <ul className="list-disc space-y-2 pr-5 leading-relaxed text-gray-800 dark:text-gray-200">
           <li>
-            صورة الكتابة بتتبعت لخدمة Google Gemini عشان تتحلل (ولو تعذّرت، بتتبعت تلقائياً لخدمة Groq كبديل). الموقع نفسه مش بيخزّن الصورة. ما ترفعش صور
-            فيها اسم الطفل أو بيانات تعريفية.
+            صورة الكتابة بتتبعت لخدمة Google Gemini عشان تتحلل (ولو تعذّرت،
+            بتتبعت تلقائياً لخدمة Groq كبديل). الموقع نفسه مش بيخزّن الصورة. ما
+            ترفعش صور فيها اسم الطفل أو بيانات تعريفية.
           </li>
           <li>
             النتيجة أولية وتعليمية، وليست تشخيصاً طبياً أو تربوياً. لو عندك قلق
@@ -184,7 +185,6 @@ export default function HowItWorksPage() {
       </section>
 
       <div className="text-center">
-        
         <Link
           href="/scanner"
           className="inline-block rounded-lg bg-blue-800 px-8 py-3 text-lg font-bold text-white hover:bg-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-800 dark:bg-blue-300 dark:text-blue-950 dark:hover:bg-blue-200 dark:focus-visible:outline-blue-300"
